@@ -4,6 +4,7 @@ go 1.20
 
 require (
 	github.com/hashicorp/go-hclog v1.5.0
+	github.com/joho/godotenv v1.5.1
 	google.golang.org/grpc v1.56.2
 	google.golang.org/protobuf v1.31.0
 )
