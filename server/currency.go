@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"time"
 
@@ -64,17 +63,15 @@ func (c *Currency) GetRate(ctx context.Context, rr *protos.RateRequest) (*protos
 	c.log.Info("Handle request for GetRate", "base", rr.GetBase(), "dest", rr.GetDestination())
 
 	if rr.Base == rr.Destination {
-		err := status.Newf(
+		// create the grpc error and return to the client
+		err := status.Errorf(
 			codes.InvalidArgument,
-			fmt.Sprintf("Base currency %s can not be same as destination currency %s", rr.GetBase().String(), rr.GetDestination().String()),
+			"Base rate %s can not be equal to destination rate %s",
+			rr.Base.String(),
+			rr.Destination.String(),
 		)
 
-		err, wde := err.WithDetails(rr)
-		if wde != nil {
-			return nil, wde
-		}
-
-		return nil, err.Err()
+		return nil, err
 	}
 
 	rate, err := c.rates.GetRate(rr.GetBase().String(), rr.GetDestination().String())
