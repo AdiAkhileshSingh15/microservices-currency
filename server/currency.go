@@ -114,31 +114,25 @@ func (c *Currency) SubscribeRates(src protos.Currency_SubscribeRatesServer) erro
 			rrs = []*protos.RateRequest{}
 		}
 
-		var validationError *status.Status
-		for _, v := range rrs {
-			if v.Base == rr.Base && v.Destination == rr.Destination {
-				validationError = status.Newf(
-					codes.AlreadyExists,
-					fmt.Sprintf("Subscription for base currency %s and destination currency %s already exists", rr.GetBase().String(), rr.GetDestination().String()),
-				)
-				validationError, err = validationError.WithDetails(rr)
+		for _, r := range rrs {
+			// if we already have subscribe to this currency return an error
+			if r.Base == rr.Base && r.Destination == rr.Destination {
+				c.log.Error("Subscription already active", "base", rr.Base.String(), "dest", rr.Destination.String())
+
+				grpcError := status.New(codes.InvalidArgument, "Subscription already active for rate")
+				grpcError, err = grpcError.WithDetails(rr)
 				if err != nil {
-					c.log.Error("Unable to add metadata to error", "error", err)
-					break
+					c.log.Error("Unable to add metadata to error message", "error", err)
+					continue
 				}
 
-				break
+				// Can't return error as that will terminate the connection, instead must send an error which
+				// can be handled by the client Recv stream.
+				rrs := &protos.StreamingRateResponse_Error{Error: grpcError.Proto()}
+				src.Send(&protos.StreamingRateResponse{Message: rrs})
 			}
 		}
 
-		if validationError != nil {
-			src.Send(&protos.StreamingRateResponse{
-				Message: &protos.StreamingRateResponse_Error{
-					Error: validationError.Proto(),
-				},
-			})
-			continue
-		}
 		rrs = append(rrs, rr)
 		c.subscriptions[src] = rrs
 	}
